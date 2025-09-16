@@ -50,18 +50,12 @@
 #include <FS.h>
 #include <Ticker.h>
 #include <StreamString.h>
-#include "driver/uart.h"
-#include "src/oi_can.h"
+#include "oi_can.h"
 
 #include <SPI.h>
 #include <SD.h>
 
 #define DBG_OUTPUT_PORT Serial
-#define INVERTER_PORT UART_NUM_2
-#define INVERTER_RX 16
-#define INVERTER_TX 17
-#define UART_TIMEOUT (100 / portTICK_PERIOD_MS)
-#define UART_MESSBUF_SIZE 100
 #define LED_BUILTIN  5
 
 #define RESERVED_SD_SPACE 2000000000
@@ -77,10 +71,17 @@
 
 #define LOG_DELAY_VAL 10000
 
-//HardwareSerial Inverter(INVERTER_PORT);
-
 const char* host = "inverter";
-char uartMessBuff[UART_MESSBUF_SIZE];
+
+// Helper function to check if string contains only digits
+bool isDigitsOnly(const String& str) {
+  for (size_t i = 0; i < str.length(); i++) {
+    if (!isDigit(str.charAt(i))) {
+      return false;
+    }
+  }
+  return true;
+}
 char jsonFileName[50];
 //DynamicJsonDocument jsonDoc(30000);
 
@@ -133,6 +134,9 @@ bool handleFileRead(String path){
     if(SPIFFS.exists(pathWithGz))
       path += ".gz";
     File file = SPIFFS.open(path, "r");
+    if(!file) {
+      return false;
+    }
     server.sendHeader("Cache-Control", "max-age=86400");
     size_t sent = server.streamFile(file, contentType);
     file.close();
@@ -144,11 +148,12 @@ bool handleFileRead(String path){
     DBG_OUTPUT_PORT.println(path);
 
     File file = SD.open(path);
-    if (file) {
-      size_t sent = server.streamFile(file, contentType);
-      file.close();
-      return true;
+    if (!file) {
+      return false;
     }
+    size_t sent = server.streamFile(file, contentType);
+    file.close();
+    return true;
   }
   return false;
 }
@@ -204,10 +209,9 @@ void handleFileCreate(){
   if(SPIFFS.exists(path))
     return server.send(500, "text/plain", "FILE EXISTS");
   File file = SPIFFS.open(path, "w");
-  if(file)
-    file.close();
-  else
+  if(!file)
     return server.send(500, "text/plain", "CREATE FAILED");
+  file.close();
   server.send(200, "text/plain", "");
   path = String();
 }
@@ -227,7 +231,6 @@ void handleSdCardList() {
     server.send(200, "text/json", "{\"error\": \"Root is not a directory\"}");
     return;
   }
-  File sdFile = root.openNextFile();
   String output = "[";
 
   File file = root.openNextFile();
@@ -250,7 +253,7 @@ void handleSdCardList() {
 void handleFileList() {
   String path = "/";
   if(server.hasArg("dir"))
-    String path = server.arg("dir");
+    path = server.arg("dir");
   //DBG_OUTPUT_PORT.println("handleFileList: " + path);
   File root = SPIFFS.open(path);
   String output = "[";
@@ -276,48 +279,6 @@ void handleFileList() {
   server.send(200, "text/json", output);
 }
 
-void uart_readUntill(char val)
-{
-  int retVal;
-  do
-  {
-    retVal = uart_read_bytes(UART_NUM_2, uartMessBuff, 1, UART_TIMEOUT);
-  }
-  while((retVal>0) && (uartMessBuff[0] != val));
-}
-
-bool uart_readStartsWith(const char *val)
-{
-  bool retVal = false;
-  int rxBytes = uart_read_bytes(UART_NUM_2, uartMessBuff, strnlen(val,UART_MESSBUF_SIZE), UART_TIMEOUT);
-  if(rxBytes >= strnlen(val,UART_MESSBUF_SIZE))
-  {
-    if(strncmp(val, uartMessBuff, strnlen(val,UART_MESSBUF_SIZE))==0)
-      retVal = true;
-    uartMessBuff[rxBytes] = 0;
-    DBG_OUTPUT_PORT.println(uartMessBuff);
-  }
-  return retVal;
-}
-
-
-
-static void sendCommand(String cmd)
-{
-  DBG_OUTPUT_PORT.println("Sending '" + cmd + "' to inverter");
-  //Inverter.print("\n");
-  uart_write_bytes(INVERTER_PORT, "\n", 1);
-  delay(1);
-  //while(Inverter.available())
-  //  Inverter.read(); //flush all previous output
-  uart_flush(INVERTER_PORT);
-  //Inverter.print(cmd);
-  uart_write_bytes(INVERTER_PORT, cmd.c_str(), cmd.length());
-  //Inverter.print("\n");
-  uart_write_bytes(INVERTER_PORT, "\n", 1);
-  //Inverter.readStringUntil('\n'); //consume echo
-  uart_readUntill('\n');
-}
 
 static void handleCommand() {
   const int cmdBufSize = 128;
@@ -328,15 +289,26 @@ static void handleCommand() {
   digitalWrite(LED_BUILTIN, HIGH);
 
   if (cmd == "json") {
-    if (!OICan::SendJson(server.client()))
+    if (!OICan::SendJson(server.client())) {
       server.send(500, "text/plain", "CAN communication error");
+      return;
+    }
   }
   else if (cmd.startsWith("set")) {
     String str(cmd);
     int nameStart = str.indexOf(' ');
     int valueStart = str.lastIndexOf(' ');
+    int endPos = str.indexOf('\r');
+
+    if (nameStart == -1 || valueStart == -1 || endPos == -1 || nameStart >= valueStart || valueStart >= endPos) {
+      server.send(400, "text/plain", "Invalid set command format");
+      return;
+    }
+
     String name = str.substring(nameStart, valueStart);
-    double value = str.substring(valueStart, str.indexOf('\r')).toDouble();
+    String valueStr = str.substring(valueStart, endPos);
+    valueStr.trim();
+    double value = valueStr.toDouble();
     name.trim();
 
     switch (OICan::SetValue(name, value)) {
@@ -358,9 +330,18 @@ static void handleCommand() {
     String str(cmd);
     int samplesStart = str.indexOf(' ');
     int namesStart = str.lastIndexOf(' ');
-    int samples = str.substring(samplesStart, namesStart).toInt();
+    int endPos = str.indexOf('\r');
 
-    String names = str.substring(namesStart, str.indexOf('\r'));
+    if (samplesStart == -1 || namesStart == -1 || endPos == -1 || samplesStart >= namesStart || namesStart >= endPos) {
+      server.send(400, "text/plain", "Invalid stream command format");
+      return;
+    }
+
+    String samplesStr = str.substring(samplesStart, namesStart);
+    samplesStr.trim();
+    int samples = samplesStr.toInt();
+
+    String names = str.substring(namesStart, endPos);
     String result = OICan::StreamValues(names, samples);
 
     server.send(200, "text/plain", result);
@@ -406,7 +387,13 @@ static void handleUpdate()
 {
   static int pages = 0;
   if(!server.hasArg("step") || !server.hasArg("file")) {server.send(500, "text/plain", "BAD ARGS"); return;}
-  int step = server.arg("step").toInt();
+
+  String stepStr = server.arg("step");
+  if(stepStr.length() == 0 || !isDigitsOnly(stepStr)) {
+    server.send(400, "text/plain", "Invalid step parameter");
+    return;
+  }
+  int step = stepStr.toInt();
   String message;
   digitalWrite(LED_BUILTIN, HIGH);
 
@@ -425,13 +412,32 @@ static void handleUpdate()
 static void handleNodeId()
 {
   if(server.hasArg("id") && server.hasArg("canspeed")) {
-    int id = server.arg("id").toInt();
-    int speed = server.arg("canspeed").toInt();
+    String idStr = server.arg("id");
+    String speedStr = server.arg("canspeed");
+
+    if(!isDigitsOnly(idStr) || !isDigitsOnly(speedStr)) {
+      server.send(400, "text/plain", "Invalid parameters");
+      return;
+    }
+
+    int id = idStr.toInt();
+    int speed = speedStr.toInt();
+
+    if(speed < 0 || speed > 2) {
+      server.send(400, "text/plain", "Invalid CAN speed");
+      return;
+    }
+
     OICan::BaudRate baud = speed == 0 ? OICan::Baud125k : (speed == 1 ? OICan::Baud250k : OICan::Baud500k);
     OICan::Init(id, baud);
   }
   else if(server.hasArg("id")) {
-    int id = server.arg("id").toInt();
+    String idStr = server.arg("id");
+    if(!isDigitsOnly(idStr)) {
+      server.send(400, "text/plain", "Invalid ID parameter");
+      return;
+    }
+    int id = idStr.toInt();
     OICan::Init(id, OICan::Baud500k);
   }
 
@@ -453,6 +459,10 @@ static void handleWifi()
   else
   {
     File file = SPIFFS.open("/wifi.html", "r");
+    if(!file) {
+      server.send(500, "text/plain", "Failed to load WiFi settings");
+      return;
+    }
     String html = file.readString();
     file.close();
     html.replace("%staSSID%", WiFi.SSID());
@@ -465,8 +475,10 @@ static void handleWifi()
   if (updated)
   {
     File file = SPIFFS.open("/wifi-updated.html", "r");
-    size_t sent = server.streamFile(file, getContentType("wifi-updated.html"));
-    file.close();
+    if(file) {
+      size_t sent = server.streamFile(file, getContentType("wifi-updated.html"));
+      file.close();
+    }
   }
 }
 
@@ -482,37 +494,47 @@ void staCheck(){
 
 void setup(void){
   DBG_OUTPUT_PORT.begin(115200);
-  //Inverter.setRxBufferSize(50000);
-  //Inverter.begin(115200, SERIAL_8N1, INVERTER_RX, INVERTER_TX);
-  //Need to use low level Espressif IDF API instead of Serial to get high enough data rates
-  uart_config_t uart_config = {
-        .baud_rate = 115200,
-        .data_bits = UART_DATA_8_BITS,
-        .parity    = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE};
-
-  uart_param_config(INVERTER_PORT, &uart_config);
-  uart_set_pin(INVERTER_PORT, INVERTER_TX, INVERTER_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-  uart_driver_install(INVERTER_PORT, SDIO_BUFFER_SIZE * 3, 0, 0, NULL, 0); //x3 allows twice card write size to buffer while writes
-  delay(100);
 
   pinMode(LED_BUILTIN, OUTPUT);
 
 
   //Start SPI Flash file system
-  SPIFFS.begin();
+  if (!SPIFFS.begin(true)) {
+    DBG_OUTPUT_PORT.println("SPIFFS Mount Failed! Formatting...");
+    if (SPIFFS.format()) {
+      DBG_OUTPUT_PORT.println("SPIFFS formatted successfully");
+      if (SPIFFS.begin()) {
+        DBG_OUTPUT_PORT.println("SPIFFS mounted after formatting");
+      } else {
+        DBG_OUTPUT_PORT.println("SPIFFS still failed to mount after formatting");
+      }
+    } else {
+      DBG_OUTPUT_PORT.println("SPIFFS formatting failed!");
+    }
+  } else {
+    DBG_OUTPUT_PORT.println("SPIFFS mounted successfully");
+  }
 
   //WIFI INIT
   #ifdef WIFI_IS_OFF_AT_BOOT
     enableWiFiAtBootTime();
   #endif
+
+  DBG_OUTPUT_PORT.println("Initializing WiFi...");
   WiFi.mode(WIFI_AP_STA);
-  //WiFi.setPhyMode(WIFI_PHY_MODE_11B);
   WiFi.setSleep(false);
-  WiFi.setTxPower(WIFI_POWER_19_5dBm);//25); //dbm
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
+
+  // Give WiFi some time to initialize
+  delay(1000);
+
+  // Try to connect to saved WiFi if available
   WiFi.begin();
+  delay(2000);
+
   sta_tick.attach(10, staCheck);
+
+  DBG_OUTPUT_PORT.println("WiFi initialization complete");
 
   MDNS.begin(host);
 
@@ -563,7 +585,8 @@ void setup(void){
   });
 
   server.begin();
-  server.client().setNoDelay(1);
+  // Note: setNoDelay should be called on active client connections, not here
+  // server.client().setNoDelay(1);  // Removed - causes "Bad file number" error
 
   MDNS.addService("http", "tcp", 80);
 
