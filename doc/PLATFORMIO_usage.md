@@ -57,12 +57,12 @@ Run this command (need to do this after each update of the files):
 
 ```
 $ pio run
-Processing release (platform: espressif8266; framework: arduino; board: modwifi)
+Processing release (platform: espressif32; framework: arduino; board: esp32dev)
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Verbose mode can be enabled via `-v, --verbose` option
 CONFIGURATION: https://docs.platformio.org/page/boards/espressif8266/modwifi.html
-PLATFORM: Espressif 8266 (4.0.1) > Olimex MOD-WIFI-ESP8266(-DEV)
-HARDWARE: ESP8266 80MHz, 80KB RAM, 2MB Flash
+PLATFORM: Espressif 32 (6.4.0) > Espressif ESP32 Dev Module
+HARDWARE: ESP32 240MHz, 320KB RAM, 4MB Flash
 PACKAGES:
  - framework-arduinoespressif8266 @ 3.30002.0 (3.0.2)
  - tool-esptool @ 1.413.0 (4.13)
@@ -115,17 +115,30 @@ release        SUCCESS   00:00:09.971
 ```
 
 
-# Flashing resulting firmware to the ESP8266 board
-Note: you should first setup the ESP8266 in UART mode. (In general, keep the button depressed when applying power, then release the button)
+# Flashing resulting firmware to the ESP32 board
+Note: you should first setup the ESP32 in UART mode. (In general, keep the BOOT button depressed when applying power, then release the button)
+
+## Lilygo T-CAN485 Pin Configuration
+This project uses the following pin configuration for Lilygo T-CAN485:
+- CAN_TX: GPIO 27
+- CAN_RX: GPIO 26
+- WS2812B LED: GPIO 4 (uses FastLED library with asynchronous color coding):
+  - **Green**: System initialization (100ms auto-off)
+  - **Blue**: CAN communication active (100ms auto-off)
+  - **White**: Web page loading (100ms auto-off)
+  - **Red**: Error conditions (100ms auto-off)
+  - **Off**: Idle state
+  - **Asynchronous**: Non-blocking, immediate state changes
+- Serial to inverter: RX GPIO 16, TX GPIO 17
 
 ```
 $ pio run --target upload
-Processing release (platform: espressif8266; framework: arduino; board: modwifi)
+Processing release (platform: espressif32; framework: arduino; board: esp32dev)
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Verbose mode can be enabled via `-v, --verbose` option
 CONFIGURATION: https://docs.platformio.org/page/boards/espressif8266/modwifi.html
-PLATFORM: Espressif 8266 (4.0.1) > Olimex MOD-WIFI-ESP8266(-DEV)
-HARDWARE: ESP8266 80MHz, 80KB RAM, 2MB Flash
+PLATFORM: Espressif 32 (6.4.0) > Espressif ESP32 Dev Module
+HARDWARE: ESP32 240MHz, 320KB RAM, 4MB Flash
 PACKAGES:
  - framework-arduinoespressif8266 @ 3.30002.0 (3.0.2)
  - tool-esptool @ 1.413.0 (4.13)
@@ -266,12 +279,12 @@ It's also possible to automate the building of the filesystem, and its uploading
 This will only build it.
 ```
 $ pio run --target buildfs
-Processing release (platform: espressif8266; framework: arduino; board: modwifi)
+Processing release (platform: espressif32; framework: arduino; board: esp32dev)
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Verbose mode can be enabled via `-v, --verbose` option
 CONFIGURATION: https://docs.platformio.org/page/boards/espressif8266/modwifi.html
-PLATFORM: Espressif 8266 (4.0.1) > Olimex MOD-WIFI-ESP8266(-DEV)
-HARDWARE: ESP8266 80MHz, 80KB RAM, 2MB Flash
+PLATFORM: Espressif 32 (6.4.0) > Espressif ESP32 Dev Module
+HARDWARE: ESP32 240MHz, 320KB RAM, 4MB Flash
 PACKAGES:
  - framework-arduinoespressif8266 @ 3.30002.0 (3.0.2)
  - tool-esptool @ 1.413.0 (4.13)
@@ -332,12 +345,12 @@ release        SUCCESS   00:00:01.383
 This action does the build + flash steps in one operation.
 ```
 $ pio run --target uploadfs
-Processing release (platform: espressif8266; framework: arduino; board: modwifi)
+Processing release (platform: espressif32; framework: arduino; board: esp32dev)
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Verbose mode can be enabled via `-v, --verbose` option
 CONFIGURATION: https://docs.platformio.org/page/boards/espressif8266/modwifi.html
-PLATFORM: Espressif 8266 (4.0.1) > Olimex MOD-WIFI-ESP8266(-DEV)
-HARDWARE: ESP8266 80MHz, 80KB RAM, 2MB Flash
+PLATFORM: Espressif 32 (6.4.0) > Espressif ESP32 Dev Module
+HARDWARE: ESP32 240MHz, 320KB RAM, 4MB Flash
 PACKAGES:
  - framework-arduinoespressif8266 @ 3.30002.0 (3.0.2)
  - tool-esptool @ 1.413.0 (4.13)
@@ -430,7 +443,7 @@ release        SUCCESS   00:00:05.926
 # Clean build files if needed
 ```
 $ pio run --target clean
-Processing release (platform: espressif8266; framework: arduino; board: modwifi)
+Processing release (platform: espressif32; framework: arduino; board: esp32dev)
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Build environment is clean
 Done cleaning

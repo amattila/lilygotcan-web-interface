@@ -48,7 +48,9 @@
 #include <ESPmDNS.h>
 #include <ArduinoOTA.h>
 #include <FS.h>
+// Simple WS2812B LED control without FastLED
 #include <Ticker.h>
+#include <MD5Builder.h>
 #include <StreamString.h>
 #include "oi_can.h"
 
@@ -56,7 +58,109 @@
 #include <SD.h>
 
 #define DBG_OUTPUT_PORT Serial
-#define LED_BUILTIN  5
+
+// Lilygo T-CAN485 pin definitions
+#define WS2812B_DATA 4  // WS2812B LED data pin
+#define LED_BUILTIN WS2812B_DATA  // Use WS2812B as built-in LED
+
+// Simple WS2812B LED control
+struct RGBColor {
+    uint8_t r, g, b;
+};
+
+RGBColor currentLEDColor = {0, 0, 0};
+
+// LED state management - Asynchronous, non-blocking with 100ms auto-timeout
+enum LEDState {
+    LED_OFF,       // Black - idle state
+    LED_INIT,      // Green - system initialization (100ms auto-off)
+    LED_CAN,       // Blue - CAN communication active (100ms auto-off)
+    LED_WEB,       // White - web page loading (100ms auto-off)
+    LED_ERROR      // Red - error condition (100ms auto-off)
+};
+
+static LEDState currentLEDState = LED_OFF;
+static unsigned long ledStartTimes[5] = {0}; // Timestamps for all LED states
+static const unsigned long LED_DURATION = 100; // All LED states duration in milliseconds
+
+// WS2812B LED control using ESP32 RMT (Remote Control) peripheral
+#include <driver/rmt.h>
+
+// WS2812B timing constants (in RMT ticks, 80MHz clock = 12.5ns per tick)
+#define WS2812B_T0H  14  // 175ns (1.4 * 12.5ns)
+#define WS2812B_T0L  28  // 350ns (2.8 * 12.5ns)
+#define WS2812B_T1H  28  // 350ns (2.8 * 12.5ns)
+#define WS2812B_T1L  14  // 175ns (1.4 * 12.5ns)
+#define WS2812B_RESET 2800  // 35us reset (2800 * 12.5ns)
+
+static rmt_item32_t ws2812b_buffer[24]; // 24 bits for RGB
+
+void writeWS2812B(uint8_t r, uint8_t g, uint8_t b) {
+    // Convert RGB to WS2812B bitstream (GRB order)
+    uint32_t grb = ((uint32_t)g << 16) | ((uint32_t)r << 8) | b;
+
+    // Fill RMT buffer with timing data
+    for(int i = 0; i < 24; i++) {
+        if(grb & (1 << (23 - i))) {
+            // Bit 1: T1H + T1L
+            ws2812b_buffer[i].duration0 = WS2812B_T1H;
+            ws2812b_buffer[i].level0 = 1;
+            ws2812b_buffer[i].duration1 = WS2812B_T1L;
+            ws2812b_buffer[i].level1 = 0;
+        } else {
+            // Bit 0: T0H + T0L
+            ws2812b_buffer[i].duration0 = WS2812B_T0H;
+            ws2812b_buffer[i].level0 = 1;
+            ws2812b_buffer[i].duration1 = WS2812B_T0L;
+            ws2812b_buffer[i].level1 = 0;
+        }
+    }
+
+    // Send reset signal
+    rmt_write_items(RMT_CHANNEL_0, ws2812b_buffer, 24, true);
+    delayMicroseconds(50); // Reset delay
+
+    currentLEDColor.r = r;
+    currentLEDColor.g = g;
+    currentLEDColor.b = b;
+}
+
+// LED control functions - Asynchronous, immediate state changes
+void setLEDColor(RGBColor color) {
+    writeWS2812B(color.r, color.g, color.b);
+}
+
+void setLEDState(LEDState state) {
+    if (currentLEDState == state) return; // Avoid unnecessary updates
+
+    currentLEDState = state;
+
+    // Record timestamp for all LED states (except OFF)
+    if (state != LED_OFF) {
+        ledStartTimes[state] = millis();
+    }
+
+    switch (state) {
+        case LED_INIT:
+            setLEDColor({0, 255, 0}); // Green
+            break;
+        case LED_CAN:
+            setLEDColor({0, 0, 255}); // Blue
+            break;
+        case LED_WEB:
+            setLEDColor({255, 255, 255}); // White
+            break;
+        case LED_ERROR:
+            setLEDColor({255, 0, 0}); // Red
+            break;
+        case LED_OFF:
+        default:
+            setLEDColor({0, 0, 0}); // Black
+            break;
+    }
+}
+
+// LED system is fully asynchronous - no delays, non-blocking operation
 
 #define RESERVED_SD_SPACE 2000000000
 #define SDIO_BUFFER_SIZE 16384
@@ -107,6 +211,20 @@ String formatBytes(uint64_t bytes){
   }
 }
 
+String calculateMD5(File file) {
+  MD5Builder md5;
+  md5.begin();
+
+  uint8_t buf[512];
+  size_t len;
+  while ((len = file.read(buf, sizeof(buf))) > 0) {
+    md5.add(buf, len);
+  }
+
+  md5.calculate();
+  return md5.toString();
+}
+
 String getContentType(String filename){
   if(server.hasArg("download")) return "application/octet-stream";
   else if(filename.endsWith(".bin")) return "application/octet-stream";
@@ -127,6 +245,9 @@ String getContentType(String filename){
 
 bool handleFileRead(String path){
   //DBG_OUTPUT_PORT.println("handleFileRead: " + path);
+  // Show white LED when loading web pages
+  setLEDState(LED_WEB);
+
   if(path.endsWith("/")) path += "index.html";
   String contentType = getContentType(path);
   String pathWithGz = path + ".gz";
@@ -153,6 +274,8 @@ bool handleFileRead(String path){
     }
     size_t sent = server.streamFile(file, contentType);
     file.close();
+    // Turn off LED after serving file
+    setLEDState(LED_OFF);
     return true;
   }
   return false;
@@ -241,7 +364,9 @@ void handleSdCardList() {
     output += file.isDirectory()?"dir":"file";
     output += "\",\"name\":\"";
     output += String(file.name());
-    output += "\"}";
+    output += "\",\"size\":";
+    output += String(file.size());
+    output += "}";
     file = root.openNextFile();
   }
 
@@ -271,6 +396,13 @@ void handleFileList() {
     output += file.isDirectory()?"dir":"file";
     output += "\",\"name\":\"";
     output += String(file.name());
+    output += "\",\"size\":";
+    output += String(file.size());
+    output += ",\"md5\":\"";
+    if (!file.isDirectory()) {
+      String md5 = calculateMD5(file);
+      output += md5;
+    }
     output += "\"}";
     file = root.openNextFile();
   }
@@ -286,11 +418,13 @@ static void handleCommand() {
 
   String cmd = server.arg("cmd");
 
-  digitalWrite(LED_BUILTIN, HIGH);
+  // Show blue LED during CAN communication
+  setLEDState(LED_CAN);
 
   if (cmd == "json") {
     if (!OICan::SendJson(server.client())) {
       server.send(500, "text/plain", "CAN communication error");
+      setLEDState(LED_ERROR);
       return;
     }
   }
@@ -323,6 +457,7 @@ static void handleCommand() {
         break;
       case OICan::CommError:
         server.send(200, "text/plain", "CAN communication error");
+        setLEDState(LED_ERROR);
         break;
     }
   }
@@ -355,11 +490,13 @@ static void handleCommand() {
     }
   }
 
-  digitalWrite(LED_BUILTIN, LOW);
+  // Turn off LED after command processing
+  setLEDState(LED_OFF);
 }
 
 static void handleCanMap() {
-  digitalWrite(LED_BUILTIN, HIGH);
+  // Show blue LED during CAN mapping operations
+  setLEDState(LED_CAN);
   OICan::SetResult res = OICan::Ok;
 
   if (server.hasArg("add")) {
@@ -376,11 +513,17 @@ static void handleCanMap() {
 
   if (res == OICan::Ok)
     OICan::SendCanMapping(server.client());
-  else if (res == OICan::CommError)
+  else if (res == OICan::CommError) {
     server.send(500, "text/plain", "CAN communication error");
-  else if (res == OICan::UnknownIndex)
+    setLEDState(LED_ERROR);
+  }
+  else if (res == OICan::UnknownIndex) {
     server.send(500, "text/plain", "Invalid request");
-  digitalWrite(LED_BUILTIN, LOW);
+    setLEDState(LED_ERROR);
+  }
+
+  // Turn off LED after CAN mapping operation
+  setLEDState(LED_OFF);
 }
 
 static void handleUpdate()
@@ -395,7 +538,7 @@ static void handleUpdate()
   }
   int step = stepStr.toInt();
   String message;
-  digitalWrite(LED_BUILTIN, HIGH);
+  setLEDState(LED_CAN);
 
   if (step < 0)
     pages = OICan::StartUpdate(server.arg("file"));
@@ -406,7 +549,7 @@ static void handleUpdate()
   }
 
   server.send(200, "text/json", "{ \"message\": \"" + message + "\", \"pages\": " + pages + " }");
-  digitalWrite(LED_BUILTIN, LOW);
+  setLEDState(LED_OFF);
 }
 
 static void handleNodeId()
@@ -495,7 +638,15 @@ void staCheck(){
 void setup(void){
   DBG_OUTPUT_PORT.begin(115200);
 
-  pinMode(LED_BUILTIN, OUTPUT);
+  // Initialize RMT for WS2812B LED control
+  rmt_config_t config = RMT_DEFAULT_CONFIG_TX((gpio_num_t)WS2812B_DATA, RMT_CHANNEL_0);
+  config.clk_div = 2; // 40MHz RMT clock (80MHz APB clock / 2)
+
+  rmt_config(&config);
+  rmt_driver_install(RMT_CHANNEL_0, 0, 0);
+
+  // Show green LED during initialization
+  setLEDState(LED_INIT);
 
 
   //Start SPI Flash file system
@@ -577,11 +728,13 @@ void setup(void){
   //called when the url is not defined here
   //use it to load content from SPIFFS
   server.onNotFound([](){
+    setLEDState(LED_WEB);
     if(!handleFileRead(server.uri()))
     {
       server.sendHeader("Refresh", "6; url=/update");
       server.send(404, "text/plain", "FileNotFound");
     }
+    setLEDState(LED_OFF);
   });
 
   server.begin();
@@ -600,6 +753,7 @@ void setup(void){
     DBG_OUTPUT_PORT.println(str);
   }
 
+  setLEDState(LED_OFF);
 }
 
 void loop(void){
@@ -610,4 +764,10 @@ void loop(void){
   ArduinoOTA.handle();
 
   OICan::Loop();
+
+  // Check if any LED should be turned off (asynchronous timer - no blocking)
+  if (currentLEDState != LED_OFF && (millis() - ledStartTimes[currentLEDState]) >= LED_DURATION) {
+    // Turn off LED after 100ms timeout for all states
+    setLEDState(LED_OFF);
+  }
 }

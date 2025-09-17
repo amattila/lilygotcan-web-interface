@@ -24,42 +24,49 @@ Learn more : https://www.arduino.cc/en/software
 [Download](https://www.arduino.cc/en/software#download) the IDE, and follow the [Getting Started](https://www.arduino.cc/en/Guide)
 guide.
 
-Additionally, install (by following the instructions in the following links) the 2 following IDE plugins:
-* https://github.com/esp8266/arduino-esp8266fs-plugin
-* https://github.com/earlephilhower/arduino-esp8266littlefs-plugin
+Additionally, install (by following the instructions in the following links) the ESP32 filesystem plugin:
+* https://github.com/me-no-dev/arduino-esp32fs-plugin
 
-When you start the Arduino IDE, you should now have two additional options in the `Tools` menu:
-* ESP8266 LittleFS Data Upload
-* ESP8266 Sketch Data Upload
+When you start the Arduino IDE, you should now have an additional option in the `Tools` menu:
+* ESP32 Sketch Data Upload
 
 # Configuring Arduino IDE
 
 In the `Preferences` pane for the IDE, look for `Additional Boards Manager URLs`, click on the button on the right, and append the following URL:
-`https://arduino.esp8266.com/stable/package_esp8266com_index.json`
+`https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`
 
-In the `Tools` menu, select the `Board` entry, click on the `Boards Manager...` submenu, enter `esp8266` in the search box and press Enter.
+In the `Tools` menu, select the `Board` entry, click on the `Boards Manager...` submenu, enter `esp32` in the search box and press Enter.
 
-You should have one entry named `esp8266 by ESP8266 Community` ; click on `Install` and wait for installation.
+You should have one entry named `esp32 by Espressif Systems` ; click on `Install` and wait for installation.
 
-Open the project `File` > `Open` and navigate to the `FSBrowser.ino` file, and open it.
+Open the project by navigating to the `src` folder and opening the `main.cpp` file as a sketch.
 
-Go back to the `Tools` menu, and in the `Board` entry select the `ESP8266 Boards` choose your board (`Olimex MOD-WIFI-ESP8266(-DEV))
+Go back to the `Tools` menu, and in the `Board` entry select the `ESP32 Arduino` section and choose your board (`ESP32 Dev Module` or `ESP32 WROOM-32`)
+
+## Lilygo T-CAN485 Specific Configuration
+This project is optimized for Lilygo T-CAN485 module with the following pin configuration:
+- CAN_TX: GPIO 27
+- CAN_RX: GPIO 26
+- WS2812B LED: GPIO 4 (uses FastLED library with asynchronous color coding):
+  - **Green**: System initialization (100ms auto-off)
+  - **Blue**: CAN communication active (100ms auto-off)
+  - **White**: Web page loading (100ms auto-off)
+  - **Red**: Error conditions (100ms auto-off)
+  - **Off**: Idle state
+  - **Asynchronous**: Non-blocking, immediate state changes
+- Serial to inverter: RX GPIO 16, TX GPIO 17
 
 Configure the other parameters the following way:
 
-* Upload Speed : 921600
-* CPU Frequency : 80MHz
-* Flash Size: 2MB (FS:512KB OTA:~768KB)
-* Debug port: Disabled
-* Debug level: None
-* lwIP Variant: v2 Lower Memory
-* VTables: Flash
-* C++ Exceptions: Disabled (new aborts on oom)
-* Stack Protection: Disabled
-* Erase Flash: Only Sketch
-* SSL Support: All SSL Ciphers (most compatible)
-* MMU: 32KB cache + 32KB IRAM (balanced)
-* Non-32-bit access: Use pgm_read macros for IRAM/PROGMEM
+* Upload Speed : 460800
+* CPU Frequency : 240MHz
+* Flash Frequency : 80MHz
+* Flash Mode : DIO
+* Flash Size : 4MB (FS:2MB OTA:~1019KB)
+* Partition Scheme : Default 4MB with SPIFFS
+* PSRAM : Disabled
+* Arduino Runs On : Core 1
+* Events Run On : Core 1
 * Port: (_lookup the port on which your USB/Serial adapter is. You can also choose the board if it's up, connected to your WiFi, for OTA flashing_)
 
 That's it ! Your IDE should now be configured for your day to day operations.

@@ -7,8 +7,16 @@ References: https://github.com/jsphuebner/esp32-web-interface/tree/can-backend
 ## Preconditions:
 - Arduino IDE 2.2.1 installed (quite new in December 2023).
 - ESP32 support installed in the Arduino IDE.
-- Hardware: ESP32 Dev Module. This contains a micro-USB for initial flashing.
-- CAN transceiver added to the ESP32 module. CAN_TX = GPIO_NUM_25, CAN_RX = GPIO_NUM_26.
+- Hardware: Lilygo T-CAN485 module (recommended) or ESP32 Dev Module with CAN transceiver.
+- Lilygo T-CAN485 has built-in CAN transceiver: CAN_TX = GPIO 27, CAN_RX = GPIO 26
+- WS2812B LED: GPIO 4 (uses FastLED library with asynchronous color coding):
+  - **Green**: System initialization (100ms auto-off)
+  - **Blue**: CAN communication active (100ms auto-off)
+  - **White**: Web page loading (100ms auto-off)
+  - **Red**: Error conditions (100ms auto-off)
+  - **Off**: Idle state
+  - **Asynchronous**: Non-blocking, immediate state changes
+- For ESP32 Dev Module: CAN transceiver required, CAN_TX = GPIO 27, CAN_RX = GPIO 26 (recommended)
 
 ## Getting the project
 ```

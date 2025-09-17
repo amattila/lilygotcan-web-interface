@@ -50,13 +50,28 @@ The board announces itself to the world using mDNS protocol (aka Bonjour, or Ren
 So first try to reach it on http://inverter.local/
 
 # Hardware
-The web interface has been initially designed to run on ESP32-WROOM-32E boards.
+The web interface is designed to run on ESP32-based boards, specifically optimized for Lilygo T-CAN485 module.
 
+## Supported Hardware
+- **Primary**: Lilygo T-CAN485 (ESP32 + CAN transceiver)
+- **Compatible**: Any ESP32 board with CAN transceiver
+
+## Pin Configuration (Lilygo T-CAN485)
+- CAN_TX: GPIO 27
+- CAN_RX: GPIO 26
+- WS2812B LED: GPIO 4 (uses FastLED library with asynchronous color coding):
+  - **Green**: System initialization (100ms auto-off)
+  - **Blue**: CAN communication active (100ms auto-off)
+  - **White**: Web page loading (100ms auto-off)
+  - **Red**: Error conditions (100ms auto-off)
+  - **Off**: Idle state
+  - **Asynchronous**: No delays, immediate state changes, non-blocking
+- Serial (to inverter): RX GPIO 16, TX GPIO 17
+
+## Optional Hardware
 A SD card running in SDIO mode can be connected (CLK to pin14, CMD to pin15, D0 to Pin2, D1 to Pin4, D2 to Pin12, D3 to Pin13).
 
-A RTC can be connected.  As standard a PCF8523 is suported but any clock supported by RTClib can be used with a sketch change. (SCLK to Pin22, SDA to Pin21). 
-
-The connection to the inverter are on Pin16 (Rx line connect to inverter Tx line) and Pin17 (Tx line connect to inverter Rx line).
+A RTC can be connected. As standard a PCF8523 is supported but any clock supported by RTClib can be used with a sketch change. (SCLK to Pin22, SDA to Pin21).
 
 # Firmware
 Tompile it follow the [instructions below](#development).

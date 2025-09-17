@@ -1,46 +1,36 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
 <!--
- * This file is part of the esp8266 web interface
- *
+ * ESP32 Web Interface for OpenInverter
  * Copyright (C) 2018 Johannes Huebner <dev@johanneshuebner.com>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
+ * Licensed under GNU GPL v3
 -->
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-<title>Huebner Inverter Management Console</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" type="image/png" href="favicon.png">
+<title>OpenInverter Management Console</title>
 <link href="style.css" rel="stylesheet" type="text/css" />
-<script src="chart.min.js" type="text/javascript"></script>
-<script src="modal.js" type="text/javascript"></script>
-<script src="docstrings.js" type="text/javascript"></script>
-<script src="inverter.js" type="text/javascript"></script>
-<script src="index.js" type="text/javascript"></script>
-<script src="subscription.js" type="text/javascript"></script>
-<script src="log.js" type="text/javascript"></script>
-<script src="wifi.js" type="text/javascript"></script>
-<script src="plot.js" type="text/javascript"></script>
-<script src="gauge.min.js" type="text/javascript"></script>
-<script src="ui.js" type="text/javascript"></script>
+<script src="chart.min.js" defer></script>
+<script src="gauge.min.js" defer></script>
+<script src="common.min.js" defer></script>
+<script src="monitoring.min.js" defer></script>
+<script src="modal.js" defer></script>
+<script src="docstrings.js" defer></script>
+<script src="inverter.js" defer></script>
+<script src="index.js" defer></script>
+<script src="log.js" defer></script>
+<script src="wifi.js" defer></script>
+<script src="plot.js" defer></script>
+<script src="ui.js" defer></script>
 
 </head>
 
 <body onload="ui.onLoad()">
 
 	<div id="content" class="dark-theme">
-
+		
 		<!-- Large modal -->
 		<div id="large-modal-overlay" class="modal-overlay">
 			<div id="large-modal-container" class="large-modal-container">
@@ -60,7 +50,7 @@
 		</div>
 
     <div id="communication-error-bar" class="communication-error-bar">
-			<p>Communication problem between ESP and STM</p>
+			<p>CAN communication problem with inverter</p>
 		</div>
 
 		<!-- 'Add CAN Mapping' modal -->
@@ -113,16 +103,16 @@
 -					</tr>
 				</table>
 				<button onclick="ui.canMapping();">
-					<!-- /icon-check-circle.png -->
-					<img class="buttonimg" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAbBJREFUSInF1c1KVVEUwPFfUd6i7xtlIRWFFUIPYGAQd9QbNFOIEh8hBJv4NhE0CBQHQV80CEu0oiwqm9kosaAmchqcped027d7j95oweIc1sd/7c1ea2/+s9Qxhnv4hLXQpbCN4uBmwDVMYhVZG13GzirwM5gvAaYxgn7swPb4H8EU7mJbKf8oZvE4BT+NzwF+i8EqKwv4y8h/1uysYS6cD7G3IvwIFiL/DY41B0yGcxH7ug0/rDjQi1uEH08FjSkOtOtw8p7OMPwv4PAxAs8mfPfxNIAp+Cv0NuXcCd2QnxHckygwG76FAJfhrxNwihnakB9hqCWCewO0XqQdfE/4v5eNS2E8l0hoLvI3OJyPmA/kYy9WResW/YIGXoQ2wpaSofg+LxtHo+pMi6Qq8iBYN8rGumLQhv7M6VguB+OrxFUzEc73OLAJ+CG8C8Z4KmCXoiUfVSxSx5PInZNud3BK0VGLuNQBvCHfdSa/6vvaJZxQXNuZfJKvYwC75U/kAK4pDjST774tfF16cAsrJUArXcVN6SH97alLyX5cxRVcwEn51K/EimdwG986XXnX5ReKvJKLP0fJ2wAAAABJRU5ErkJggg==">Save CAN mapping</button>
+
+					<img class="buttonimg" src="images/icon-check-circle.png" alt="Check circle icon">Save CAN mapping</button>
 			</div>
 		</div>
 
-		<aside id="navbar" class="navbar">
+		<nav id="navbar" class="navbar">
 
-			<div id="logo">
-				<img src="logo.png" onclick="ui.toggleNavbar();">
-			</div>
+			<header id="logo">
+				<img src="logo.png" onclick="ui.toggleNavbar();" alt="OpenInverter Logo">
+			</header>
 
       <div>
 				<a class="tablink active" onclick="ui.openPage('dashboard', this, 'white')" >
@@ -186,7 +176,7 @@
 
 			<div id="version" class="small-screen-hide"></div>
 
-		</aside>
+		</nav>
 
 		<div id="content-wrapper">
 			<div id="content-wrapper-inner">
@@ -682,8 +672,8 @@
 				</div>
 				<!-- END SUPPORT -->
 
-			</div> <!-- end content-wrapper -->
-		</div> <!-- end content-wrapper-inner -->
+			</div> <!-- end content-wrapper-inner -->
+		</div> <!-- end content-wrapper -->
 
 	</div>
 

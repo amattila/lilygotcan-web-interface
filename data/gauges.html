@@ -59,14 +59,14 @@ if (!String.prototype.repeat) {
   }
 }
 </script>
-<script src="gauge.min.js" type="text/javascript"></script>
-<script src="inverter.js" type="text/javascript"></script>
-<script src="gauges.js" type="text/javascript"></script>
-<script src="ui.js" type="text/javascript"></script>
+<script src="gauge.min.js" defer></script>
+<script src="inverter.js" defer></script>
+<script src="gauges.js" defer></script>
+<script src="ui.js" defer></script>
 </head>
 <body onload="onLoad()">
   <div id="communication-error-bar" class="communication-error-bar">
-    <p>Communication problem between ESP and STM</p>
+    <p>CAN communication problem with inverter</p>
   </div>
 <div id="gauges">
 </div>

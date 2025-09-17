@@ -47,13 +47,11 @@ var ui = {
 		// buttons
 		var buttons = document.getElementsByClassName("buttonimg");
 		for ( let i = 0; i < buttons.length; i++ ) {
-			console.log("button ", i, " ", buttons[i]);
 			buttons[i].style.width = "60px";
 		}
 		// hide toggles, version box
 		var itemsToHideOnSmallScreen = document.getElementsByClassName("small-screen-hide");
 		for ( let i = 0; i < itemsToHideOnSmallScreen.length; i++ ) {
-			console.log("item ", i, " ", itemsToHideOnSmallScreen[i]);
 			itemsToHideOnSmallScreen[i].style.display = "none";
 		}
 	},
@@ -172,6 +170,35 @@ var ui = {
 	    }
 	},
 
+	/** @brief Load subscription data from subscription.js file if it exists */
+	loadSubscriptionData: function()
+	{
+		var xhr = new XMLHttpRequest();
+		xhr.onload = function()
+		{
+			if (xhr.status === 200)
+			{
+				try {
+					// Execute the subscription.js content to set the subscription variable
+					eval(xhr.responseText);
+					console.log("Loaded subscription data:", subscription);
+				} catch(ex) {
+					console.error("Failed to parse subscription data:", ex);
+				}
+			} else {
+				// File doesn't exist or other error - this is normal
+				console.log("Subscription file not available (status:", xhr.status, ")");
+			}
+		};
+		xhr.onerror = function()
+		{
+			// Network error - this is also normal if file doesn't exist
+			console.log("Could not load subscription file");
+		};
+		xhr.open("GET", "/subscription.js", true);
+		xhr.send();
+	},
+
 	/** @brief excutes when page finished loading. Creates tables and chart */
 	onLoad: function()
 	{
@@ -188,6 +215,9 @@ var ui = {
 
 		var selectedStorage = document.getElementById('storage');
 		selectedStorage.addEventListener('change', () => ui.populateFileList())
+
+		// Load subscription data if available
+		ui.loadSubscriptionData();
 
 		ui.updateTables();
 		plot.generateChart();
@@ -450,12 +480,12 @@ var ui = {
     }
 	},
 
-	/** @brief Show notification bar */
+	/** @brief Show CAN communication error notification bar */
 	showCommunicationErrorBar: function() {
 		document.getElementById('communication-error-bar').style.display = 'block';
 	},
 
-	/** @brief Hide notification bar */
+	/** @brief Hide CAN communication error notification bar */
 	hideCommunicationErrorBar: function() {
 		document.getElementById('communication-error-bar').style.display = 'none';
 	},
@@ -807,7 +837,6 @@ var ui = {
     /** @brief install over-the-air update */
     installOTAFirmwareUpdate: function()
     {
-    	console.log("installOTAFirmwareUpdate start");
     	// get release selected
     	var releaseURL = document.getElementById('ota-release').value;
 
@@ -824,7 +853,6 @@ var ui = {
     	releaseRequest.onload = function()
     	{
     		var releaseBlob = releaseRequest.response;
-    		console.log(releaseBlob);
     		// build form we will submit to /edit to upload the file blob
     		var editFormData = new FormData();
     		editFormData.append("updatefile", releaseBlob, "stm32.bin");
@@ -1265,6 +1293,12 @@ var ui = {
 		var existigCanMappingTable = document.getElementById("existingCanMappingTable");
 		// emtpy the table
 		while (existigCanMappingTable.rows.length > 1) existigCanMappingTable.deleteRow(1);
+
+		// Check if values is a valid array
+		if (!values || !Array.isArray(values)) {
+			console.warn("Invalid CAN mapping data received:", values);
+			return;
+		}
 
     for (var i = 0; i < values.length; i++) {
       var param = paramsCache.getById(values[i].paramid);
