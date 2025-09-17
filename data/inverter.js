@@ -93,6 +93,14 @@ var inverter = {
       }
     }
 
+    xmlhttp.onerror = function() {
+      console.log(req + ": Network error");
+      paramsCache.failedFetchCount += 1;
+      if ( paramsCache.failedFetchCount >= 2 ){
+        ui.showCommunicationErrorBar();
+      }
+    }
+
     if (repeat)
       req += "&repeat=" + repeat;
 
@@ -119,11 +127,15 @@ var inverter = {
             inverter.firmwareVersion = parseFloat(param.value);
         }
       } catch(ex) {
-        console.error("Failed to parse parameter list JSON:", ex);
+        console.error("Failed to parse parameter list JSON:", ex, "Reply:", reply);
       }
 
       paramsCache.setData(params);
       if (replyFunc) replyFunc(params);
+    }, null, function(error) {
+      console.error("Failed to get parameter list:", error);
+      paramsCache.setData({});
+      if (replyFunc) replyFunc({});
     });
   },
 
@@ -138,13 +150,19 @@ var inverter = {
         try {
           replyFunc(JSON.parse(this.responseText));
         } catch(ex) {
-          console.error("Failed to parse CAN mapping JSON:", ex);
+          console.error("Failed to parse CAN mapping JSON:", ex, "Reply:", this.responseText);
+          replyFunc([]);
         }
       } else if (replyFunc) {
         console.warn("CAN mapping request failed with status:", xmlhttp.status);
         // Call replyFunc with empty array to avoid breaking UI
         replyFunc([]);
       }
+    }
+
+    xmlhttp.onerror = function() {
+      console.error("CAN mapping request failed:", req);
+      if (replyFunc) replyFunc([]);
     }
 
     xmlhttp.open("GET", req, true);

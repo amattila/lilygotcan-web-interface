@@ -222,7 +222,7 @@ var ui = {
 		ui.updateTables();
 		plot.generateChart();
 		ui.parameterDatabaseCheckForUpdates();
-		inverter.canMapping(ui.populateExistingCanMappingTable);
+		// CAN mapping will be loaded after parameters are loaded
 		wifi.populateWiFiTab();
 		ui.populateFileList();
 		ui.refreshStatusBox();
@@ -413,6 +413,9 @@ var ui = {
 
 			document.getElementById("paramDownload").href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(params, null, 2));
 			document.getElementById("spinner-div").style.visibility = "hidden";
+
+			// Load CAN mapping after parameters are loaded
+			inverter.canMapping(ui.populateExistingCanMappingTable);
 		});
 	},
 
@@ -1304,7 +1307,7 @@ var ui = {
       var param = paramsCache.getById(values[i].paramid);
       var mapping = values[i];
 
-      if (typeof param.id !== 'undefined') {
+      if (param && typeof param.id !== 'undefined') {
         var tr = existigCanMappingTable.insertRow(-1);
         // name of spot value
         var canNameCell = tr.insertCell(-1);
@@ -1341,10 +1344,12 @@ var ui = {
 		var select = document.getElementById("add-can-mapping-spot-value-drop-down");
     for (var name in paramsCache.getData()) {
       var param = paramsCache.getEntry(name);
-      var el = document.createElement("option");
-      el.textContent = name;
-      el.value = param.id;
-      select.appendChild(el);
+      if (param && typeof param.id !== 'undefined') {
+        var el = document.createElement("option");
+        el.textContent = name;
+        el.value = param.id;
+        select.appendChild(el);
+      }
     }
 	},
 

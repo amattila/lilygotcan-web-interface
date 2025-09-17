@@ -434,7 +434,12 @@ static void handleCommand() {
     int valueStart = str.lastIndexOf(' ');
     int endPos = str.indexOf('\r');
 
-    if (nameStart == -1 || valueStart == -1 || endPos == -1 || nameStart >= valueStart || valueStart >= endPos) {
+    // If no carriage return found, use string length as end position
+    if (endPos == -1) {
+      endPos = str.length();
+    }
+
+    if (nameStart == -1 || valueStart == -1 || nameStart >= valueStart || valueStart >= endPos) {
       server.send(400, "text/plain", "Invalid set command format");
       return;
     }
@@ -467,7 +472,12 @@ static void handleCommand() {
     int namesStart = str.lastIndexOf(' ');
     int endPos = str.indexOf('\r');
 
-    if (samplesStart == -1 || namesStart == -1 || endPos == -1 || samplesStart >= namesStart || namesStart >= endPos) {
+    // If no carriage return found, use string length as end position
+    if (endPos == -1) {
+      endPos = str.length();
+    }
+
+    if (samplesStart == -1 || namesStart == -1 || samplesStart >= namesStart || namesStart >= endPos) {
       server.send(400, "text/plain", "Invalid stream command format");
       return;
     }
@@ -631,6 +641,10 @@ void staCheck(){
   sta_tick.detach();
   if(!(uint32_t)WiFi.localIP()){
     WiFi.mode(WIFI_AP); //disable station mode
+  } else {
+    // WiFi connected successfully, print IP address
+    DBG_OUTPUT_PORT.print("WiFi connected. IP address: ");
+    DBG_OUTPUT_PORT.println(WiFi.localIP());
   }
 }
 
